@@ -1,0 +1,100 @@
+﻿@page "/Cars/View"
+@using BlazorApp1.Shared.Models;
+@inject HttpClient http
+@inject IJSRuntime JS
+<div class="row">
+    <div class="col-12">
+        @if (car is null)
+        {
+            <div>Loading...</div>
+        }
+        else
+        {
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <h3>Car</h3>
+                <a href="/Cars/Create" class="btn btn-primary btn-sm">Add New</a>
+            </div>
+            <table class="table table-bordered table-striped">
+                <thead class="bg-light">
+                    <tr>
+                        <th></th>
+                        <th>CarName</th>
+                        <th>Launch Date</th>
+                        <th>Price</th>
+                        <th>Stock</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in car)
+                    {
+                        <tr>
+                            <td class="text-center"><img class="rounded-circle" src="/Pictures/@c.Picture" style="width:40px" /></td>
+                            <td>@c.CarName</td>
+                            <td>@string.Format($"{c.LaunchDate:yyyy-MM-dd}")</td>
+                            <td>@string.Format($"{c.Price:0.00}")</td>
+                            <td>@(c.IsStock ? "Yes" : "No")</td>
+                            <td>
+                                <a class="btn btn-success btn-sm" href="/Cars/Edit/@c.CarDetailId">Edit</a>
+                                <button class="btn btn-danger btn-sm" @onclick="() => Del(c.CarDetailId)">Delete</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td colspan="5">
+                                <h6>Parts</h6>
+                                <table class="table table-bordered">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th>Parts Name</th>
+                                            <th>Parts Price</th>
+
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var s in c.PartsDetails)
+                                        {
+                                            <tr>
+                                                <td>@s.PartName</td>
+                                                <td>@s.PartsPrice</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@code {
+    private List<CarDetail> car = null!;
+    protected async override Task OnInitializedAsync()
+    {
+        var data = await this.http.GetFromJsonAsync<List<CarDetail>>("/api/Cars/Parts");
+        if (data is not null)
+        {
+            this.car = data;
+        }
+    }
+    private async Task Del(int id)
+    {
+        var ok = await JS.InvokeAsync<bool>("confirm", "Are you sure?");
+        if (ok)
+        {
+            var response = await http.DeleteAsync($"api/Cars/{id}");
+            if (response.IsSuccessStatusCode)
+            {
+                var index = car.FindIndex(x => x.CarDetailId == id);
+                if (index >= 0)
+                {
+                    car.RemoveAt(index);
+                }
+            }
+        }
+    }
+
+}

@@ -1,0 +1,196 @@
+﻿@page "/Cars/Edit/{id:int}"
+@using System.Net.Http.Headers;
+@using BlazorApp1.Shared.Models;
+@using BlazorApp1.Shared.ViewModels;
+@inject HttpClient http
+<div class="row">
+    @if (car is not null)
+    {
+        <div class="col-8">
+            <EditForm Model="@car" OnValidSubmit="Save">
+                <DataAnnotationsValidator />
+                <h3>Edit Car</h3>
+                @if (isError is not null && msg != "" && !isError.Value)
+                {
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <strong>Success!</strong> Data saved.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                }
+                @if (isError is not null && msg != "" && isError.Value)
+                {
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <strong>Failed!</strong> Failed to save data.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                }
+                <div class="form-group row mb-1">
+                    <label class="col-form-label col-form-label-sm col-2">Car Name</label>
+                    <div class="col-4">
+                        <InputText class="form-control form-control-sm" @bind-Value="car.CarName" />
+                        <ValidationMessage For="@(()=> car.CarName)" class="text-danger" />
+                    </div>
+
+                </div>
+                <div class="form-group row mb-1">
+                    <label class="col-form-label col-form-label-sm col-2">Launch Date</label>
+                    <div class="col-4">
+                        <InputDate Type="InputDateType.Date" class="form-control form-control-sm" @bind-Value="car.LaunchDate" />
+                        <ValidationMessage For="@(()=> car.LaunchDate)" class="text-danger" />
+                    </div>
+
+                </div>
+                <div class="form-group row mb-1">
+                    <label class="col-form-label col-form-label-sm col-2">Price</label>
+                    <div class="col-10">
+                        <InputNumber class="form-control form-control-sm" @bind-Value="car.Price" />
+                        <ValidationMessage For="@(()=> car.Price)" class="text-danger" />
+                    </div>
+
+                </div>
+                <div class="form-group row mb-1">
+                    <label class="col-form-label col-form-label-sm col-2">IsStock</label>
+                    <div class="col-10">
+                        <InputCheckbox @bind-Value="car.IsStock" />
+                    </div>
+
+                </div>
+                <div class="form-group row mb-1">
+                    <label class="col-form-label col-form-label-sm col-2">Price</label>
+                    <div class="col-10">
+                        <InputFile OnChange="@OnInputFileChange" class="form-control form-control-sm" />
+                        <input type="hidden" @bind="car.Picture" />
+                        <ValidationMessage For="@(()=> car.Picture)" class="text-danger" />
+                    </div>
+
+                </div>
+                <div class="form-group row mb-1 col-12">
+                    <div class="d-flex justify-content-between mb-1">
+                        <h6>Specs</h6>
+                        <button @onclick="@AddParts" type="button" class="btn btn-primary btn-sm">+</button>
+                    </div>
+                    @foreach (var s in car.PartsDetails)
+                    {
+                        <div class="form-group row mb-1">
+                            <label class="col-form-label col-form-label-sm col-2">Name</label>
+                            <div class="col-4">
+                                <InputText @bind-Value="@s.PartName" class="form-control form-control-sm" />
+
+                                <ValidationMessage For="@(()=> s.PartName)" class="text-danger" />
+                            </div>
+                            <label class="col-form-label col-form-label-sm col-2">Value</label>
+                            <div class="col-3">
+                                <InputNumber @bind-Value="@s.PartsPrice" class="form-control form-control-sm" />
+
+                                <ValidationMessage For="@(()=> s.PartsPrice)" class="text-danger" />
+                            </div>
+                            <div class="col-1">
+                                <button @onclick="@(()=>RemoveSpec(@s))" type="button" class="btn btn-danger btn-sm">X</button>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="form-group row">
+
+                    <div class="col-12 text-end">
+                        <button type="submit" class="btn btn-primary">Update</button>
+                    </div>
+
+                </div>
+            </EditForm>
+        </div>
+        <div class="col-4">
+            <img src="/Pictures/@car.Picture" style="width:200px" />
+        </div>
+    }
+    else
+    {
+        <div class="col-12">Loading...</div>
+    }
+</div>
+
+<div class="d-flex justify-content-start align-items-center mb-1">
+    <a href="/Cars/View" class="btn btn-primary btn-sm">Back to List</a>
+</div>
+
+@code {
+    [Parameter]
+    public int id { get; set; }
+    private CarDetail car { get; set; } = default!;
+    private IBrowserFile? selectedFile;
+    private bool? isError;
+    private string msg = "";
+    private void AddParts()
+    {
+        this.car.PartsDetails.Add(new PartsDetail());
+    }
+    private void RemoveSpec(PartsDetail s)
+    {
+        car.PartsDetails.Remove(s);
+    }
+    private void OnInputFileChange(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        //device.Picture = e.File.Name;
+
+        //this.StateHasChanged();
+    }
+    protected async override Task OnInitializedAsync()
+    {
+        var data = await this.http.GetFromJsonAsync<CarDetail>($"/api/Cars/Parts/{id}");
+        if (data is not null)
+        {
+            this.car = data;
+        }
+    }
+    private async Task Save()
+    {
+        isError = false;
+        msg = "";
+        if (selectedFile is not null)
+        {
+            var saveImage = await UploadItAsysnc();
+            car.Picture = saveImage.StoredFileName;
+        }
+        for (var i = 0; i < car.PartsDetails.Count; i++)
+        {
+            car.PartsDetails.ToList()[i].CarDetail = null;
+        }
+
+        var response = await http.PutAsJsonAsync($"api/Cars/{id}", car);
+        if (response.IsSuccessStatusCode)
+        {
+            isError = false;
+            msg = "Ok";
+
+        }
+        else
+        {
+            isError = true;
+            msg = "Failed";
+        }
+    }
+    private async Task<ImageUploadResponse> UploadItAsysnc()
+    {
+        using (var ms = new MemoryStream())
+        {
+
+            if (selectedFile is not null)
+            {
+                var content = new MultipartFormDataContent();
+                var fileContent = new StreamContent(selectedFile.OpenReadStream(long.MaxValue));
+
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(selectedFile.ContentType);
+                content.Add(content: fileContent, name: "\"file\"", fileName: selectedFile.Name);
+                var response = await http.PostAsync("api/Cars/Upload", content);
+                var r = await response.Content.ReadFromJsonAsync<ImageUploadResponse>();
+                return r == null ? new ImageUploadResponse() : r;
+            }
+            else
+            {
+                return new ImageUploadResponse();
+            }
+
+        }
+    }
+}
